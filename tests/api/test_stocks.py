@@ -82,11 +82,63 @@ def test_quote_returns_200(client: TestClient) -> None:
 
 
 def test_quote_returns_404_for_unknown_symbol(client: TestClient) -> None:
-    with patch("psxdata.quote", return_value=pd.DataFrame()):
+    screener = pd.DataFrame({"symbol": ["ENGRO", "LUCKXD"], "price": [481.99, 1100.0]})
+    with (
+        patch("psxdata.quote", return_value=pd.DataFrame()),
+        patch("psxdata.screener", return_value=screener),
+    ):
         resp = client.get("/stocks/FAKE/quote")
     assert resp.status_code == 404
     body = resp.json()
     assert body["error"]["code"] == "not_found"
+
+
+def test_quote_exact_match_skips_screener(client: TestClient) -> None:
+    df = pd.DataFrame({"symbol": ["ENGRO"], "price": [481.99]})
+    with (
+        patch("psxdata.quote", return_value=df),
+        patch("psxdata.screener") as mock_screener,
+    ):
+        resp = client.get("/stocks/ENGRO/quote")
+    assert resp.status_code == 200
+    mock_screener.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    ("requested", "listed"),
+    [
+        ("LUCK", "LUCKXD"),  # ex-dividend window: PSX lists the suffixed ticker
+        ("luck", "LUCKXD"),
+        ("FCCL", "FCCLXB"),
+        ("ISL", "ISLXR"),
+        ("LUCKXD", "LUCK"),  # window over: a client still asking for the suffixed ticker
+        ("LUCKXD", "LUCKXB"),  # one corporate action followed by another
+    ],
+)
+def test_quote_falls_back_to_corporate_action_ticker(
+    client: TestClient, requested: str, listed: str
+) -> None:
+    screener = pd.DataFrame({"symbol": ["ENGRO", listed], "price": [481.99, 1100.0]})
+    with (
+        patch("psxdata.quote", return_value=pd.DataFrame()),
+        patch("psxdata.screener", return_value=screener),
+    ):
+        resp = client.get(f"/stocks/{requested}/quote")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["data"]["symbol"] == listed
+    assert body["data"]["price"] == pytest.approx(1100.0)
+
+
+def test_quote_does_not_match_unrelated_suffixes(client: TestClient) -> None:
+    """Rights letters (JVDCR1) and other instruments are separate securities, not aliases."""
+    screener = pd.DataFrame({"symbol": ["JVDCR1", "XD"], "price": [5.0, 1.0]})
+    with (
+        patch("psxdata.quote", return_value=pd.DataFrame()),
+        patch("psxdata.screener", return_value=screener),
+    ):
+        assert client.get("/stocks/JVDC/quote").status_code == 404
+        assert client.get("/stocks/XD/quote").status_code == 404
 
 
 def test_fundamentals_returns_200_with_data(client: TestClient) -> None:

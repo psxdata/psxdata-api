@@ -143,10 +143,40 @@ def get_historical(
     )
 
 
+# While a corporate action is pending, PSX lists a stock under a suffixed ticker (LUCK trades as
+# LUCKXD once it goes ex-dividend) and drops the suffix again afterwards. XD = ex-dividend,
+# XB = ex-bonus, XR = ex-rights.
+_CORPORATE_ACTION_SUFFIXES = ("XD", "XB", "XR")
+
+
+def _quote_aliases(symbol: str) -> list[str]:
+    """Other tickers the same stock may be listed under, in lookup order."""
+    base = symbol
+    if len(symbol) > 2 and symbol.endswith(_CORPORATE_ACTION_SUFFIXES):
+        base = symbol[:-2]
+    candidates = [base + suffix for suffix in _CORPORATE_ACTION_SUFFIXES] + [base]
+    return [c for c in candidates if c != symbol]
+
+
+def _find_quote(psx: PsxSource, symbol: str) -> pd.DataFrame:
+    df = psx.fetch("quote", symbol)
+    if not df.empty:
+        return df
+    # quote() just loaded the screener into psxdata's cache, so this does not call PSX again
+    screener = psx.fetch("screener")
+    if screener.empty or "symbol" not in screener.columns:
+        return df
+    for alias in _quote_aliases(symbol):
+        match = screener[screener["symbol"] == alias]
+        if not match.empty:
+            return match.reset_index(drop=True)
+    return df
+
+
 @router.get("/stocks/{symbol}/quote", response_model=QuoteResponse)
 @limiter.limit("60/minute")
 def get_quote(request: Request, symbol: str, psx: PsxSource = Depends(psx_source)) -> QuoteResponse:
-    df = psx.fetch("quote", symbol.upper())
+    df = _find_quote(psx, symbol.upper())
     if df.empty:
         raise HTTPException(status_code=404, detail=f"{symbol.upper()} not found")
     row = _df_to_records(df)[0]
