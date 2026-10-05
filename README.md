@@ -113,10 +113,10 @@ Every response wraps its payload in a consistent envelope.
 | ----------- | ------ | ------- |
 | 400, 422 | `bad_request` | Invalid input or query parameters |
 | 404 | `not_found` | Symbol or index does not exist |
-| 429 | `rate_limited` | Exceeded 60 requests/minute per IP |
+| 429 | `rate_limited` | Exceeded 60 requests/minute per IP, or 20 uncached requests/minute per IP (sent with a `Retry-After` header) |
 | 502 | `upstream_data_error` | Upstream PSX data failed validation |
 | 502 | `proxy_unreachable` | The `X-PSX-Proxy` you sent did not accept a connection |
-| 503 | `psx_unavailable` | PSX website unreachable, or PSX is rate-limiting the API (sent with a `Retry-After` header) |
+| 503 | `psx_unavailable` | PSX website unreachable, PSX is rate-limiting the API, or the server's own PSX budget is used up (sent with a `Retry-After` header) |
 | 500 | `internal_error` | Unexpected server error |
 
 ---
@@ -124,6 +124,13 @@ Every response wraps its payload in a consistent envelope.
 ## Rate Limiting
 
 60 requests per minute per IP address. Exceeding the limit returns `429 rate_limited`.
+
+Requests that need fresh data from PSX have tighter limits, because PSX rate-limits the server as a whole:
+
+- **20 per minute per IP.** Beyond that: `429 rate_limited`.
+- **60 per minute across all clients.** Beyond that: `503 psx_unavailable`.
+
+Both responses carry a `Retry-After` header. Requests answered from the cache don't count, and `/historical` serves its last cached copy (`X-Cache: STALE`) instead of an error when it has one. Each server instance keeps its own counts.
 
 ---
 
@@ -175,6 +182,8 @@ All settings are optional environment variables.
 | -------- | ------- | ----------- |
 | `REDIS_URL` | unset | Redis-compatible server for the `/historical` cache, e.g. an [Aiven for Valkey](https://aiven.io/valkey) service URI (`rediss://default:<password>@<host>:<port>`). Keeps the cache across restarts and instances. When unset, or when the server is unreachable, the API falls back to an in-memory cache and keeps working. |
 | `HISTORICAL_CACHE_MARKET_TTL` | `1800` | How long, in seconds, `/historical` data stays fresh during PSX trading hours. |
+| `PSX_FETCH_LIMIT_PER_IP` | `20` | PSX fetches per minute one client IP may cause (see [Rate Limiting](#rate-limiting)). `0` turns the limit off. |
+| `PSX_FETCH_LIMIT_GLOBAL` | `60` | PSX fetches per minute across all clients. `0` turns the limit off. |
 | `PSX_PROXY_PASSTHROUGH` | off | Set to `true` to honour the per-request `X-PSX-Proxy` header (see [Proxy Passthrough](#proxy-passthrough)). |
 
 ```bash

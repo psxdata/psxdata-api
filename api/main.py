@@ -23,16 +23,18 @@ from api.dependencies import limiter
 from api.proxy import ProxyPassthrough, ProxyUnreachableError
 from api.routers import router_registry
 from api.telemetry import TELEMETRY, ServerSpanTags
+from api.upstream import UpstreamBudget, UpstreamBudgetExceeded
 
 logger = logging.getLogger("api")
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Build the /historical cache on startup and close its backend on shutdown."""
+    """Build the /historical cache and PSX budgets on startup; close the cache on shutdown."""
     service = build_historical_service(os.environ)
     app.state.historical_service = service
     app.state.proxy_passthrough = ProxyPassthrough.from_env(os.environ)
+    app.state.upstream_budget = UpstreamBudget.from_env(os.environ)
     try:
         yield
     finally:
@@ -80,6 +82,16 @@ async def rate_limit_handler(request: Request, exc: RateLimitExceeded) -> JSONRe
         content={
             "error": {"status": 429, "code": "rate_limited", "message": "Rate limit exceeded"}
         },
+    )
+
+
+@app.exception_handler(UpstreamBudgetExceeded)
+async def upstream_budget_handler(request: Request, exc: UpstreamBudgetExceeded) -> JSONResponse:
+    code = _ERROR_CODES[exc.status_code]
+    return JSONResponse(
+        status_code=exc.status_code,
+        headers={"Retry-After": str(exc.retry_after)},
+        content={"error": {"status": exc.status_code, "code": code, "message": str(exc)}},
     )
 
 

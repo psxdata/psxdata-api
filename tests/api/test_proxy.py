@@ -385,7 +385,10 @@ class TestPsxFetchSpan:
         with patch("psxdata.tickers", return_value=["HBL"]):
             assert client.get("/stocks").status_code == 200
         attrs = dict(otel.span("psx.fetch").attributes)
-        assert attrs == {"psxdata.function": "tickers", "psxdata.proxied": False}
+        assert attrs == {
+            "psxdata.function": "tickers", "psxdata.proxied": False,
+            "psxdata.cache_only_hit": False,
+        }
         assert otel.span("psx.fetch").parent.span_id == otel.server_spans()[0].context.span_id
 
     def test_proxied_miss_then_cache_only_hit(self, client, enabled, otel):

@@ -12,14 +12,26 @@ from api.cache.historical import HistoricalService
 from api.cache.store import MemoryLRU, RedisStore, TieredStore
 from api.main import app
 from api.proxy import ProxyPassthrough
+from api.upstream import UpstreamBudget
 
 
 @pytest.fixture(autouse=True)
-def proxy_passthrough_disabled() -> ProxyPassthrough:
-    """Start every test with proxy passthrough off and an empty client pool."""
-    passthrough = ProxyPassthrough(False)
+def proxy_passthrough_disabled(tmp_path) -> ProxyPassthrough:
+    """Start every test with proxy passthrough off, an empty client pool and an empty disk cache.
+
+    Every PSX fetch checks the SDK disk cache first, so a developer's real cache must not leak in.
+    """
+    passthrough = ProxyPassthrough(False, cache_dir=str(tmp_path / "psxdata-cache"))
     app.state.proxy_passthrough = passthrough
     return passthrough
+
+
+@pytest.fixture(autouse=True)
+def fresh_upstream_budget() -> UpstreamBudget:
+    """Give every test unspent PSX fetch budgets."""
+    budget = UpstreamBudget()
+    app.state.upstream_budget = budget
+    return budget
 
 
 @pytest.fixture(autouse=True)

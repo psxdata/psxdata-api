@@ -9,6 +9,11 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+### Added
+
+- Limits on fetches from PSX: 20 per minute per client IP (`429 rate_limited`) and 60 per minute across all clients (`503 psx_unavailable`), both with `Retry-After`. Cache hits don't count, and `/historical` serves its stale copy instead when it has one. Set with `PSX_FETCH_LIMIT_PER_IP` and `PSX_FETCH_LIMIT_GLOBAL` (`0` turns a limit off). The defaults sit below the rate at which PSX started refusing the server on 2026-09-29.
+- `psx.fetch` spans for direct fetches now record `psxdata.cache_only_hit`, and `psxdata.budget_exceeded` (429 or 503) when a budget refuses a fetch.
+
 ### Fixed
 
 - `/stocks/{symbol}/quote` no longer returns 404 while a stock has a pending corporate action. PSX lists such stocks under a suffixed ticker (`LUCK` as `LUCKXD` once it goes ex-dividend; `XB` ex-bonus, `XR` ex-rights), so the quote now falls back to that ticker, and a suffixed request falls back to the plain one once the suffix is dropped. The response's `symbol` is the ticker PSX currently lists. The fallback reads the already-cached screener and makes no extra PSX request.

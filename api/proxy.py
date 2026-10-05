@@ -49,6 +49,7 @@ from psxdata.scrapers import token as token_module
 from slowapi.util import get_remote_address
 
 from api.telemetry import get_tracer
+from api.upstream import UpstreamBudget, UpstreamBudgetExceeded, get_upstream_budget
 
 PROXY_HEADER = "X-PSX-Proxy"
 ENABLE_ENV = "PSX_PROXY_PASSTHROUGH"
@@ -188,9 +189,11 @@ def _cache_only(client: PSXClient) -> PSXClient:
 class PsxSource:
     """Where a request's PSX data comes from.
 
-    Without a proxy: the module-level psxdata functions, as before. With one:
-    the shared caches first, and only on a miss a request through the caller's
-    proxy. Both read and write the same caches; only the route to PSX differs.
+    The shared caches first, and only on a miss a request to PSX: through the
+    caller's proxy if one was given, otherwise directly, charged to the
+    caller's upstream budget. Both read and write the same caches; only the
+    route to PSX differs. Without a passthrough or request, the module-level
+    psxdata functions are called as is.
     """
 
     def __init__(
@@ -198,10 +201,12 @@ class PsxSource:
         passthrough: ProxyPassthrough | None = None,
         request: Request | None = None,
         proxy: ParsedProxy | None = None,
+        budget: UpstreamBudget | None = None,
     ) -> None:
         self._passthrough = passthrough
         self._request = request
         self._proxy = proxy
+        self._budget = budget
 
     @property
     def proxied(self) -> bool:
@@ -214,7 +219,7 @@ class PsxSource:
             return self._fetch(span, name, *args, **kwargs)
 
     def _fetch(self, span: Span, name: str, *args: Any, **kwargs: Any) -> Any:
-        if self._passthrough is None or self._request is None or self._proxy is None:
+        if self._passthrough is None or self._request is None:
             return getattr(psxdata, name)(*args, **kwargs)
         if kwargs.get("cache", True):
             try:
@@ -225,6 +230,14 @@ class PsxSource:
                 span.set_attribute("psxdata.cache_only_hit", True)
                 return result
         span.set_attribute("psxdata.cache_only_hit", False)
+        if self._proxy is None:
+            if self._budget is not None:
+                try:
+                    self._budget.charge(get_remote_address(self._request))
+                except UpstreamBudgetExceeded as exc:
+                    span.set_attribute("psxdata.budget_exceeded", exc.status_code)
+                    raise
+            return getattr(psxdata, name)(*args, **kwargs)
         with self._passthrough.acquire(self._request, self._proxy) as client:
             return getattr(client, name)(*args, **kwargs)
 
@@ -351,7 +364,7 @@ def psx_source(
     ),
 ) -> PsxSource:
     """FastAPI dependency: the PSX data source for this request."""
-    if x_psx_proxy is None:
-        return PsxSource()
     passthrough = get_proxy_passthrough(request)
+    if x_psx_proxy is None:
+        return PsxSource(passthrough, request, budget=get_upstream_budget(request))
     return PsxSource(passthrough, request, passthrough.check(x_psx_proxy))
