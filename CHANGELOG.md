@@ -11,6 +11,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Fixed
 
+- Upgrade to psxdata 1.2.1: the screener and quote endpoints now return `market_cap` and `free_float` (previously always null), and ex-dividend stocks are returned under their plain ticker (`BAHL`, not `BAHLXD`). Installed from the GitHub release archive until 1.2.1 is published to PyPI.
 - `/stocks/{symbol}/quote` no longer returns 404 while a stock has a pending corporate action. PSX lists such stocks under a suffixed ticker (`LUCK` as `LUCKXD` once it goes ex-dividend; `XB` ex-bonus, `XR` ex-rights), so the quote now falls back to that ticker, and a suffixed request falls back to the plain one once the suffix is dropped. The response's `symbol` is the ticker PSX currently lists. The fallback reads the already-cached screener and makes no extra PSX request.
 
 ---

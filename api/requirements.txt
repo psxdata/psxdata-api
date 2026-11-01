@@ -1,5 +1,5 @@
 # API layer dependencies — installs psxdata from PyPI + FastAPI stack
-psxdata==1.2.0
+psxdata @ https://github.com/psxdata/psxdata/archive/refs/tags/v1.2.1.zip  # TODO: back to psxdata==1.2.1 once on PyPI
 fastapi[standard]>=0.142.0,<0.143
 opentelemetry-sdk>=1.45,<1.46
 uvicorn[standard]~=0.23
