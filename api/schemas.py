@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class MetaSingle(BaseModel):
@@ -84,6 +84,14 @@ class QuoteData(BaseModel):
     ldcp: float | None = None
     change: float | None = None
     change_pct: float | None = None
+    traded_today: bool | None = Field(
+        default=None,
+        description=(
+            "True if the stock has traded on PSX's regular-market board so far this session, "
+            "false if not, null if unknown. PSX keeps delisted and non-trading stocks in its "
+            "screener with their last trading day's price and change_pct."
+        ),
+    )
 
 
 class QuoteResponse(BaseModel):
@@ -157,7 +165,16 @@ class ScreenerRow(BaseModel):
     dividend_yield: float | None = None
     free_float: float | None = None
     volume_avg_30d: float | None = None
+    change_pct: float | None = None
     change_1y_pct: float | None = None
+    traded_today: bool | None = Field(
+        default=None,
+        description=(
+            "True if the stock has traded on PSX's regular-market board so far this session, "
+            "false if not, null if unknown. Filter on it before ranking change_pct: PSX keeps "
+            "delisted and non-trading stocks in its screener with their last trading day's move."
+        ),
+    )
 
 
 class ScreenerResponse(BaseModel):

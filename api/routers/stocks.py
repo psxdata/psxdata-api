@@ -180,6 +180,8 @@ def get_quote(request: Request, symbol: str, psx: PsxSource = Depends(psx_source
     if df.empty:
         raise HTTPException(status_code=404, detail=f"{symbol.upper()} not found")
     row = _df_to_records(df)[0]
+    # nullable columns (traded_today is boolean) keep pd.NA through where()
+    row = {k: (None if v is pd.NA else v) for k, v in row.items()}
     data = QuoteData.model_validate(row)
     return QuoteResponse(
         data=data,
