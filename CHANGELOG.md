@@ -9,6 +9,10 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+### Changed
+
+- Upgrade to psxdata 1.3.0, still installed from the GitHub release archive. Each screener fetch now also reads PSX's trading board, which adds two requests on a cache miss. The SDK's new `traded_today` column isn't in the response models yet.
+
 ### Fixed
 
 - Upgrade to psxdata 1.2.1: the screener and quote endpoints now return `market_cap` and `free_float` (previously always null), and ex-dividend stocks are returned under their plain ticker (`BAHL`, not `BAHLXD`). Installed from the GitHub release archive until 1.2.1 is published to PyPI.

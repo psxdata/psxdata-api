@@ -20,6 +20,7 @@ from psxdata import BaseScraper, PSXClient
 from psxdata.exceptions import PSXConnectionError
 from psxdata.proxy import normalize_proxy
 from psxdata.scrapers import token as token_module
+from psxdata.scrapers.realtime import RealtimeScraper
 from psxdata.scrapers.screener import ScreenerScraper
 
 from api.main import app
@@ -67,8 +68,14 @@ def fake_psx(
             raise error
         return result
 
+    # psxdata >= 1.3.0 reads the trading board inside screener()/quote() to set
+    # traded_today. Serve a populated board so the snapshot is complete (and
+    # cacheable) without counting it as a separate PSX contact.
+    board = pd.DataFrame({"symbol": [f"S{i}" for i in range(150)], "volume": [1] * 150})
+
     with (
         patch.object(scraper_cls, "fetch", fetch),
+        patch.object(RealtimeScraper, "fetch", lambda self, market, board_name: board),
         patch.object(BaseScraper, "_request", return_value=None),
     ):
         yield reached
@@ -250,7 +257,7 @@ class TestCacheFirst:
 
     def test_hit_on_data_cached_by_another_caller(self, client, make_passthrough, tmp_path):
         make_passthrough(resolver=refuse_network, connector=refuse_network)
-        PSXClient(cache_dir=str(tmp_path / "cache"))._cache.set("screener_all", _screener_df())
+        PSXClient(cache_dir=str(tmp_path / "cache"))._cache.set("screener_snapshot", _screener_df())
         with fake_psx(ScreenerScraper, _screener_df()) as reached:
             resp = _proxied(client, "/stocks/ENGRO/quote")
         assert resp.status_code == 200
