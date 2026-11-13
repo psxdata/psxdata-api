@@ -11,6 +11,15 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## [0.6.0] — 2026-11-13
+
+### Added
+
+- `traded_today` on `/screener` rows and `/stocks/{symbol}/quote` (from psxdata 1.3.0). PSX keeps delisted and non-trading stocks in its screener with their last trading day's price and move (FFBL showed +8.07% from 2024-12-20). `traded_today` is `true` if the stock has traded on PSX's regular-market board so far this session, `false` if not, and `null` if unknown. Filter on it before ranking daily moves.
+- `change_pct` on `/screener` rows. It was already on `/stocks/{symbol}/quote`.
+
+---
+
 ## [0.5.1] — 2026-11-13
 
 ### Changed

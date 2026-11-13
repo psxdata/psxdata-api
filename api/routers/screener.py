@@ -23,7 +23,7 @@ def list_screener(request: Request, psx: PsxSource = Depends(psx_source)) -> Scr
     df = psx.fetch("screener")
     rows: list[ScreenerRow] = []
     if not df.empty:
-        df = df.where(pd.notna(df), other=None)
+        df = df.astype(object).where(pd.notna(df), other=None)
         rows = [
             ScreenerRow(**{k: r.get(k) for k in ScreenerRow.model_fields})
             for r in df.to_dict("records")

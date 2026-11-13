@@ -81,6 +81,19 @@ def test_quote_returns_200(client: TestClient) -> None:
     assert "count" not in body["meta"]
 
 
+@pytest.mark.parametrize("flag, expected", [(True, True), (False, False), (pd.NA, None)])
+def test_quote_includes_traded_today(client: TestClient, flag, expected) -> None:
+    df = pd.DataFrame({
+        "symbol": ["ENGRO"],
+        "price": [481.99],
+        "traded_today": pd.array([flag], dtype="boolean"),
+    })
+    with patch("psxdata.quote", return_value=df):
+        resp = client.get("/stocks/ENGRO/quote")
+    assert resp.status_code == 200
+    assert resp.json()["data"]["traded_today"] is expected
+
+
 def test_quote_returns_404_for_unknown_symbol(client: TestClient) -> None:
     screener = pd.DataFrame({"symbol": ["ENGRO", "LUCKXD"], "price": [481.99, 1100.0]})
     with (

@@ -49,3 +49,30 @@ def test_screener_psx_unavailable_returns_503(client: TestClient) -> None:
         resp = client.get("/screener")
     assert resp.status_code == 503
     assert resp.json()["error"]["code"] == "psx_unavailable"
+
+
+def test_list_screener_includes_change_pct_and_traded_today(client: TestClient) -> None:
+    """traded_today (nullable boolean from psxdata >= 1.3.0) and change_pct pass through;
+    <NA> becomes null."""
+    df = pd.DataFrame({
+        "symbol": ["ENGRO", "FFBL", "LUCK"],
+        "price": [250.5, 88.94, 900.1],
+        "change_pct": [1.2, 8.07, -0.5],
+        "traded_today": pd.array([True, False, pd.NA], dtype="boolean"),
+    })
+    with patch("psxdata.screener", return_value=df):
+        resp = client.get("/screener")
+    assert resp.status_code == 200
+    rows = {r["symbol"]: r for r in resp.json()["data"]}
+    assert rows["ENGRO"]["traded_today"] is True
+    assert rows["FFBL"]["traded_today"] is False
+    assert rows["FFBL"]["change_pct"] == 8.07
+    assert rows["LUCK"]["traded_today"] is None
+
+
+def test_list_screener_without_traded_today_column(client: TestClient) -> None:
+    """Older psxdata (no traded_today column) still works: field is null."""
+    with patch("psxdata.screener", return_value=pd.DataFrame({"symbol": ["ENGRO"], "price": [1.0]})):
+        resp = client.get("/screener")
+    assert resp.status_code == 200
+    assert resp.json()["data"][0]["traded_today"] is None
