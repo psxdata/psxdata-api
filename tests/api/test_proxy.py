@@ -22,6 +22,7 @@ from psxdata.proxy import normalize_proxy
 from psxdata.scrapers import token as token_module
 from psxdata.scrapers.realtime import RealtimeScraper
 from psxdata.scrapers.screener import ScreenerScraper
+from psxdata.scrapers.sectors import SectorsScraper
 
 from api.main import app
 from api.proxy import PROXY_HEADER, ProxyPassthrough, pin_proxy
@@ -68,14 +69,16 @@ def fake_psx(
             raise error
         return result
 
-    # psxdata >= 1.3.0 reads the trading board inside screener()/quote() to set
-    # traded_today. Serve a populated board so the snapshot is complete (and
-    # cacheable) without counting it as a separate PSX contact.
+    # psxdata >= 1.3.0 reads the trading board (traded_today) and >= 1.4.0 the
+    # sector list (sector_name) inside screener()/quote(). Serve both so the
+    # snapshot is complete without counting them as separate PSX contacts.
     board = pd.DataFrame({"symbol": [f"S{i}" for i in range(150)], "volume": [1] * 150})
+    sectors = pd.DataFrame({"sector_code": ["0007"], "sector_name": ["X"]})
 
     with (
         patch.object(scraper_cls, "fetch", fetch),
         patch.object(RealtimeScraper, "fetch", lambda self, market, board_name: board),
+        patch.object(SectorsScraper, "fetch", lambda self: sectors),
         patch.object(BaseScraper, "_request", return_value=None),
     ):
         yield reached
@@ -257,7 +260,9 @@ class TestCacheFirst:
 
     def test_hit_on_data_cached_by_another_caller(self, client, make_passthrough, tmp_path):
         make_passthrough(resolver=refuse_network, connector=refuse_network)
-        PSXClient(cache_dir=str(tmp_path / "cache"))._cache.set("screener_snapshot", _screener_df())
+        PSXClient(cache_dir=str(tmp_path / "cache"))._cache.set(
+            "screener_snapshot", _screener_df().assign(sector_code="0007", sector_name="X")
+        )
         with fake_psx(ScreenerScraper, _screener_df()) as reached:
             resp = _proxied(client, "/stocks/ENGRO/quote")
         assert resp.status_code == 200

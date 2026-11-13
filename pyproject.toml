@@ -10,7 +10,7 @@ readme = "README.md"
 requires-python = ">=3.11"
 license = {file = "LICENSE.md"}
 dependencies = [
-    "psxdata[socks] @ https://github.com/psxdata/psxdata/archive/refs/tags/v1.3.0.zip",  # TODO: back to ==1.3.0 once on PyPI
+    "psxdata[socks] @ https://github.com/psxdata/psxdata/archive/refs/tags/v1.4.0.zip",  # TODO: back to ==1.4.0 once on PyPI
     "fastapi[standard]>=0.142.0,<0.143",
     "opentelemetry-sdk>=1.45,<1.46",
     "uvicorn[standard]>=0.23",

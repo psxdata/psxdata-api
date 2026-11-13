@@ -94,6 +94,20 @@ def test_quote_includes_traded_today(client: TestClient, flag, expected) -> None
     assert resp.json()["data"]["traded_today"] is expected
 
 
+def test_quote_includes_sector_code_and_name(client: TestClient) -> None:
+    df = pd.DataFrame({
+        "symbol": ["FFC"],
+        "price": [400.0],
+        "sector_code": pd.array(["0809"], dtype="string"),
+        "sector_name": pd.array([pd.NA], dtype="string"),
+    })
+    with patch("psxdata.quote", return_value=df):
+        resp = client.get("/stocks/FFC/quote")
+    assert resp.status_code == 200
+    assert resp.json()["data"]["sector_code"] == "0809"
+    assert resp.json()["data"]["sector_name"] is None
+
+
 def test_quote_returns_404_for_unknown_symbol(client: TestClient) -> None:
     screener = pd.DataFrame({"symbol": ["ENGRO", "LUCKXD"], "price": [481.99, 1100.0]})
     with (
