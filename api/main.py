@@ -17,6 +17,7 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from api import __version__
 from api.cache.factory import build_historical_service
 from api.cache.historical import COOLDOWN_MESSAGE, PSX_COOLDOWN_SECONDS
 from api.dependencies import limiter
@@ -44,6 +45,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="psxdata",
+    version=__version__,
     lifespan=lifespan,
     servers=[{"url": "https://psxdata-api.fastapicloud.dev"}],
     telemetry=TELEMETRY.config,

@@ -11,6 +11,14 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## [0.7.1] — 2026-11-13
+
+### Fixed
+
+- `/openapi.json` now reports the API's real version in `info.version`. It showed FastAPI's default `0.1.0`, so the docs site, which syncs the spec, showed it too.
+
+---
+
 ## [0.7.0] — 2026-11-13
 
 ### Added
