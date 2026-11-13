@@ -92,6 +92,14 @@ class QuoteData(BaseModel):
             "screener with their last trading day's price and change_pct."
         ),
     )
+    sector_code: str | None = Field(
+        default=None,
+        description="PSX sector code as PSX writes it, e.g. \"0809\"; null if PSX gives none.",
+    )
+    sector_name: str | None = Field(
+        default=None,
+        description="Sector name for sector_code, e.g. \"FERTILIZER\"; null if unknown.",
+    )
 
 
 class QuoteResponse(BaseModel):
@@ -174,6 +182,14 @@ class ScreenerRow(BaseModel):
             "false if not, null if unknown. Filter on it before ranking change_pct: PSX keeps "
             "delisted and non-trading stocks in its screener with their last trading day's move."
         ),
+    )
+    sector_code: str | None = Field(
+        default=None,
+        description="PSX sector code as PSX writes it, e.g. \"0809\"; null if PSX gives none.",
+    )
+    sector_name: str | None = Field(
+        default=None,
+        description="Sector name for sector_code, e.g. \"FERTILIZER\"; null if unknown.",
     )
 
 

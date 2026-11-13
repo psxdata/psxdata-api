@@ -11,6 +11,18 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## [0.7.0] — 2026-11-13
+
+### Added
+
+- `sector_code` (e.g. `"0809"`) and `sector_name` (e.g. `"FERTILIZER"`) on `/screener` rows and `/stocks/{symbol}/quote` (from psxdata 1.4.0). `sector` on screener rows stays the numeric code.
+
+### Changed
+
+- Upgrade to psxdata 1.4.0 (GitHub release archive). `pe_ratio` is now `null` where PSX shows 0.00, which it uses for no meaningful P/E (e.g. loss-making companies); before, those came back as `0`.
+
+---
+
 ## [0.6.0] — 2026-11-13
 
 ### Added

@@ -76,3 +76,20 @@ def test_list_screener_without_traded_today_column(client: TestClient) -> None:
         resp = client.get("/screener")
     assert resp.status_code == 200
     assert resp.json()["data"][0]["traded_today"] is None
+
+
+def test_list_screener_includes_sector_code_and_name(client: TestClient) -> None:
+    """sector_code/sector_name (StringDtype from psxdata >= 1.4.0) pass through; <NA> becomes null."""
+    df = pd.DataFrame({
+        "symbol": ["FFC", "PIAA"],
+        "sector": [809.0, float("nan")],
+        "price": [400.0, 22.17],
+        "sector_code": pd.array(["0809", pd.NA], dtype="string"),
+        "sector_name": pd.array(["FERTILIZER", pd.NA], dtype="string"),
+    })
+    with patch("psxdata.screener", return_value=df):
+        resp = client.get("/screener")
+    assert resp.status_code == 200
+    rows = {r["symbol"]: r for r in resp.json()["data"]}
+    assert (rows["FFC"]["sector_code"], rows["FFC"]["sector_name"]) == ("0809", "FERTILIZER")
+    assert rows["PIAA"]["sector_code"] is None and rows["PIAA"]["sector_name"] is None
