@@ -100,6 +100,21 @@ class QuoteData(BaseModel):
         default=None,
         description="Sector name for sector_code, e.g. \"FERTILIZER\"; null if unknown.",
     )
+    badge: str | None = Field(
+        default=None,
+        description=(
+            "Badge PSX shows next to the ticker (XD, XB, XR, NC, ...; several joined with +); "
+            "null if none."
+        ),
+    )
+    ex_flag: str | None = Field(
+        default=None,
+        description=(
+            "Corporate-action badge only: XD ex-dividend, XB ex-bonus, XR ex-rights; "
+            "null otherwise. "
+            "A stock that goes ex drops by about the dividend or entitlement without a real loss."
+        ),
+    )
 
 
 class QuoteResponse(BaseModel):
@@ -133,6 +148,21 @@ class IndexConstituentRow(BaseModel):
     market_cap_m: float
     freefloat_m: float | None = None
     shares_m: float | None = None
+    badge: str | None = Field(
+        default=None,
+        description=(
+            "Badge PSX shows next to the ticker (XD, XB, XR, NC, ...; several joined with +); "
+            "null if none."
+        ),
+    )
+    ex_flag: str | None = Field(
+        default=None,
+        description=(
+            "Corporate-action badge only: XD ex-dividend, XB ex-bonus, XR ex-rights; "
+            "null otherwise. "
+            "A stock that goes ex drops by about the dividend or entitlement without a real loss."
+        ),
+    )
 
 
 class IndexConstituentResponse(BaseModel):
@@ -190,6 +220,21 @@ class ScreenerRow(BaseModel):
     sector_name: str | None = Field(
         default=None,
         description="Sector name for sector_code, e.g. \"FERTILIZER\"; null if unknown.",
+    )
+    badge: str | None = Field(
+        default=None,
+        description=(
+            "Badge PSX shows next to the ticker (XD, XB, XR, NC, ...; several joined with +); "
+            "null if none."
+        ),
+    )
+    ex_flag: str | None = Field(
+        default=None,
+        description=(
+            "Corporate-action badge only: XD ex-dividend, XB ex-bonus, XR ex-rights; "
+            "null otherwise. "
+            "A stock that goes ex drops by about the dividend or entitlement without a real loss."
+        ),
     )
 
 

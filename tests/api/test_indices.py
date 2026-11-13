@@ -81,3 +81,21 @@ def test_get_index_psx_unavailable_returns_503(client: TestClient) -> None:
         resp = client.get("/indices/KSE100")
     assert resp.status_code == 503
     assert resp.json()["error"]["code"] == "psx_unavailable"
+
+
+def test_index_constituents_include_ex_flag(client: TestClient) -> None:
+    """badge/ex_flag (StringDtype from psxdata >= 1.5.0) pass through; <NA> becomes null."""
+    df = pd.DataFrame({
+        "symbol": ["ABL", "LUCK"],
+        "current_index": [1.0, 1.0],
+        "idx_weight": [1.0, 1.0],
+        "idx_point": [1.0, 1.0],
+        "market_cap_m": [1.0, 1.0],
+        "badge": pd.array(["XD", pd.NA], dtype="string"),
+        "ex_flag": pd.array(["XD", pd.NA], dtype="string"),
+    })
+    with patch("psxdata.indices", return_value=df):
+        resp = client.get("/indices/KSE100")
+    rows = {r["symbol"]: r for r in resp.json()["data"]}
+    assert rows["ABL"]["ex_flag"] == "XD" and rows["ABL"]["badge"] == "XD"
+    assert rows["LUCK"]["ex_flag"] is None and rows["LUCK"]["badge"] is None

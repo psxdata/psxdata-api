@@ -261,7 +261,8 @@ class TestCacheFirst:
     def test_hit_on_data_cached_by_another_caller(self, client, make_passthrough, tmp_path):
         make_passthrough(resolver=refuse_network, connector=refuse_network)
         PSXClient(cache_dir=str(tmp_path / "cache"))._cache.set(
-            "screener_snapshot", _screener_df().assign(sector_code="0007", sector_name="X")
+            "screener_snapshot",
+            _screener_df().assign(sector_code="0007", sector_name="X", badge=None, ex_flag=None),
         )
         with fake_psx(ScreenerScraper, _screener_df()) as reached:
             resp = _proxied(client, "/stocks/ENGRO/quote")

@@ -93,3 +93,16 @@ def test_list_screener_includes_sector_code_and_name(client: TestClient) -> None
     rows = {r["symbol"]: r for r in resp.json()["data"]}
     assert (rows["FFC"]["sector_code"], rows["FFC"]["sector_name"]) == ("0809", "FERTILIZER")
     assert rows["PIAA"]["sector_code"] is None and rows["PIAA"]["sector_name"] is None
+
+
+def test_list_screener_includes_ex_flag(client: TestClient) -> None:
+    df = pd.DataFrame({
+        "symbol": ["ABL", "AAL"],
+        "price": [171.7, 1.0],
+        "badge": pd.array(["XD", "NC"], dtype="string"),
+        "ex_flag": pd.array(["XD", pd.NA], dtype="string"),
+    })
+    with patch("psxdata.screener", return_value=df):
+        rows = {r["symbol"]: r for r in client.get("/screener").json()["data"]}
+    assert (rows["ABL"]["badge"], rows["ABL"]["ex_flag"]) == ("XD", "XD")
+    assert (rows["AAL"]["badge"], rows["AAL"]["ex_flag"]) == ("NC", None)

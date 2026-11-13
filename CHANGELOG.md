@@ -11,6 +11,18 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
+## [0.8.0] — 2026-11-13
+
+### Added
+
+- `badge` and `ex_flag` on `/screener` rows, `/stocks/{symbol}/quote` and `/indices/{name}` constituents (from psxdata 1.5.0). `ex_flag` is the corporate-action badge PSX shows next to a ticker (`XD` ex-dividend, `XB` ex-bonus, `XR` ex-rights), or `null`; `badge` is any badge (e.g. `NC`). Tickers stay plain.
+
+### Changed
+
+- Upgrade to psxdata 1.5.0 (GitHub release archive).
+
+---
+
 ## [0.7.1] — 2026-11-13
 
 ### Fixed
