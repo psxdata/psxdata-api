@@ -9,6 +9,10 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+---
+
+## [0.5.1] — 2026-11-13
+
 ### Changed
 
 - Upgrade to psxdata 1.3.0, still installed from the GitHub release archive. Each screener fetch now also reads PSX's trading board, which adds two requests on a cache miss. The SDK's new `traded_today` column isn't in the response models yet.
