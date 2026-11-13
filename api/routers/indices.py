@@ -46,7 +46,8 @@ def get_index(
 
     rows: list[IndexConstituentRow] = []
     if not df.empty:
-        df = df.where(pd.notna(df), other=None)
+        # object dtype first so nullable string columns (badge, ex_flag) give None
+        df = df.astype(object).where(pd.notna(df), other=None)
         for record in df.to_dict("records"):
             rows.append(
                 IndexConstituentRow(
@@ -57,6 +58,8 @@ def get_index(
                     market_cap_m=record.get("market_cap_m", 0.0),
                     freefloat_m=record.get("freefloat_m"),
                     shares_m=record.get("shares_m"),
+                    badge=record.get("badge"),
+                    ex_flag=record.get("ex_flag"),
                 )
             )
     return IndexConstituentResponse(

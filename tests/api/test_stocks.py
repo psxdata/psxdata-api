@@ -108,6 +108,16 @@ def test_quote_includes_sector_code_and_name(client: TestClient) -> None:
     assert resp.json()["data"]["sector_name"] is None
 
 
+def test_quote_includes_ex_flag(client: TestClient) -> None:
+    df = pd.DataFrame({
+        "symbol": ["ABL"], "price": [171.7],
+        "badge": pd.array(["XD"], dtype="string"), "ex_flag": pd.array(["XD"], dtype="string"),
+    })
+    with patch("psxdata.quote", return_value=df):
+        data = client.get("/stocks/ABL/quote").json()["data"]
+    assert (data["badge"], data["ex_flag"]) == ("XD", "XD")
+
+
 def test_quote_returns_404_for_unknown_symbol(client: TestClient) -> None:
     screener = pd.DataFrame({"symbol": ["ENGRO", "LUCKXD"], "price": [481.99, 1100.0]})
     with (
