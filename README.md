@@ -1,7 +1,7 @@
 # psxdata-api — REST API for Pakistan Stock Exchange (PSX) Data
 
 [![CI](https://github.com/psxdata/psxdata-api/actions/workflows/ci.yml/badge.svg)](https://github.com/psxdata/psxdata-api/actions/workflows/ci.yml)
-[![Documentation](https://img.shields.io/badge/docs-mintlify-blue)](https://psxdata.mintlify.app/rest-api)
+[![Documentation](https://img.shields.io/badge/docs-mintlify-blue)](https://docs.psxdata.org/rest-api)
 [![API](https://img.shields.io/badge/api-live-brightgreen)](https://psxdata-api.fastapicloud.dev)
 [![Docker Hub](https://img.shields.io/docker/v/mtauha/psxdata-api?label=Docker+Hub)](https://hub.docker.com/r/mtauha/psxdata-api)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE.md)
@@ -9,7 +9,7 @@
 **psxdata-api** is a FastAPI REST service that exposes Pakistan Stock Exchange data over HTTP. It wraps the [psxdata](https://pypi.org/project/psxdata/) Python library and ships its own Docker image, CI/CD pipeline, and auto-deploy config.
 
 **Base URL:** `https://psxdata-api.fastapicloud.dev`  
-**Documentation:** [https://psxdata.mintlify.app/rest-api](https://psxdata.mintlify.app/rest-api)
+**Documentation:** [https://docs.psxdata.org/rest-api](https://docs.psxdata.org/rest-api)
 
 ---
 
@@ -149,7 +149,7 @@ Every `/historical` response says where it came from:
 
 ## Proxy Passthrough
 
-Send an `X-PSX-Proxy` header to have the API fetch that request's PSX data through your own proxy, using psxdata's [proxy support](https://psxdata.mintlify.app/sdk/guides/proxy). The request token is fetched through the same proxy.
+Send an `X-PSX-Proxy` header to have the API fetch that request's PSX data through your own proxy, using psxdata's [proxy support](https://docs.psxdata.org/sdk/guides/proxy). The request token is fetched through the same proxy.
 
 ```bash
 curl -H "X-PSX-Proxy: http://user:pass@proxy.example.com:8080"   https://psxdata-api.fastapicloud.dev/stocks/ENGRO/quote
