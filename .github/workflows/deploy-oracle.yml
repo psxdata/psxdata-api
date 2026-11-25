@@ -88,7 +88,8 @@ jobs:
             "cd '$REMOTE_DIR' && touch .env \
              && { grep -v '^API_TAG=' .env > .env.new || true; } \
              && echo 'API_TAG=$API_TAG' >> .env.new && mv .env.new .env \
-             && docker compose pull && docker compose up -d --remove-orphans"
+             && docker compose pull && docker compose up -d --remove-orphans \
+             && docker compose exec -T caddy caddy reload --config /etc/caddy/Caddyfile"
       - name: Wait for /health
         if: steps.target.outputs.enabled == 'true'
         run: |
