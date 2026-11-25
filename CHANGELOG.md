@@ -9,6 +9,17 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+### Added
+
+- `deploy/oracle/`: a Docker Compose bundle (API, Redis, Caddy with automatic HTTPS) for running the API on a single VM, and a `Deploy to Oracle` workflow that rolls out each published image over SSH.
+- The Docker image is now published for `linux/arm64` as well as `linux/amd64`.
+- `WEB_CONCURRENCY` sets the number of uvicorn workers (default 1), and the server now honours `X-Forwarded-For` from the proxies listed in `FORWARDED_ALLOW_IPS`.
+
+### Changed
+
+- The rate limit (60 requests per minute per IP) is counted in Redis when `REDIS_URL` is set, so it holds across workers instead of applying per process. If Redis is unreachable, each process counts for itself and requests keep being served.
+- After PSX answers 429, the 60-second cooldown is shared through Redis, so every worker stops calling PSX, not just the one that was refused.
+
 ---
 
 ## [0.8.0] — 2026-11-13

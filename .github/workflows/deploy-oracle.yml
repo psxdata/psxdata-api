@@ -1,0 +1,108 @@
+name: Deploy to Oracle
+run-name: "Deploy to Oracle VM (${{ github.event_name }})"
+
+# Deploys the published Docker image to the self-hosted VM over SSH.
+# Needs repo secrets ORACLE_SSH_HOST, ORACLE_SSH_USER, ORACLE_SSH_KEY, ORACLE_SSH_KNOWN_HOSTS
+# and repo variable API_DOMAIN. Without ORACLE_SSH_HOST the job is skipped.
+on:
+  workflow_run:
+    workflows: ["Publish Docker Image"]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Image tag to deploy (e.g. 0.8.1). Empty deploys latest."
+        required: false
+        default: ""
+
+permissions: {}
+
+concurrency:
+  group: oracle-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: deploy
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      REMOTE_DIR: /opt/psxdata-api
+      API_DOMAIN: ${{ vars.API_DOMAIN }}
+      SSH_HOST: ${{ secrets.ORACLE_SSH_HOST }}
+      SSH_USER: ${{ secrets.ORACLE_SSH_USER }}
+      DISPATCH_TAG: ${{ inputs.tag }}
+      RUN_BRANCH: ${{ github.event.workflow_run.head_branch }}
+    steps:
+      - name: Check deploy target is configured
+        id: target
+        run: |
+          if [ -z "$SSH_HOST" ]; then
+            echo "::notice::ORACLE_SSH_HOST is not set; skipping the Oracle deploy."
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Resolve image tag
+        id: tag
+        if: steps.target.outputs.enabled == 'true'
+        run: |
+          tag="latest"
+          if [ -n "$DISPATCH_TAG" ]; then
+            tag="${DISPATCH_TAG#v}"
+          elif [[ "$RUN_BRANCH" =~ ^v[0-9] ]]; then
+            tag="${RUN_BRANCH#v}"
+          fi
+          if [[ ! "$tag" =~ ^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$ ]]; then
+            echo "::error::Invalid image tag: $tag"
+            exit 1
+          fi
+          echo "Deploying tag: $tag"
+          echo "value=$tag" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v7
+        if: steps.target.outputs.enabled == 'true'
+        with:
+          sparse-checkout: deploy/oracle
+      - name: Configure SSH
+        if: steps.target.outputs.enabled == 'true'
+        env:
+          SSH_KEY: ${{ secrets.ORACLE_SSH_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.ORACLE_SSH_KNOWN_HOSTS }}
+        run: |
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+      - name: Copy deploy files and start the new image
+        if: steps.target.outputs.enabled == 'true'
+        env:
+          API_TAG: ${{ steps.tag.outputs.value }}
+        run: |
+          opts=(-i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o BatchMode=yes)
+          scp "${opts[@]}" deploy/oracle/compose.yaml deploy/oracle/Caddyfile \
+            "$SSH_USER@$SSH_HOST:$REMOTE_DIR/"
+          ssh "${opts[@]}" "$SSH_USER@$SSH_HOST" \
+            "cd '$REMOTE_DIR' && touch .env \
+             && { grep -v '^API_TAG=' .env > .env.new || true; } \
+             && echo 'API_TAG=$API_TAG' >> .env.new && mv .env.new .env \
+             && docker compose pull && docker compose up -d --remove-orphans \
+             && docker compose exec -T caddy caddy reload --config /etc/caddy/Caddyfile"
+      - name: Wait for /health
+        if: steps.target.outputs.enabled == 'true'
+        run: |
+          if [ -z "$API_DOMAIN" ]; then
+            echo "::error::Repository variable API_DOMAIN is not set"
+            exit 1
+          fi
+          for i in $(seq 1 24); do
+            if curl -fsS --max-time 10 "https://$API_DOMAIN/health" > /dev/null; then
+              echo "https://$API_DOMAIN/health is up"
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "::error::https://$API_DOMAIN/health did not come up within 2 minutes"
+          exit 1

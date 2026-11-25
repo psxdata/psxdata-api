@@ -63,3 +63,10 @@ def test_lifespan_installs_service_without_redis(monkeypatch) -> None:
     with TestClient(app) as client:
         assert client.get("/health").status_code == 200
         assert app.state.historical_service.store.l2.enabled is False
+
+
+def test_factory_shares_one_redis_client_with_the_cooldown() -> None:
+    service = build_historical_service({"REDIS_URL": "redis://127.0.0.1:1/0"})
+    assert service._cooldown_redis is not None
+    assert service._cooldown_redis is service.store.l2._client
+    assert build_historical_service({})._cooldown_redis is None

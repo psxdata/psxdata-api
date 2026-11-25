@@ -73,4 +73,4 @@ def build_historical_service(env: Mapping[str, str]) -> HistoricalService:
                 "Cache backend unreachable at startup: %s (%s)", host, type(exc).__name__
             )
     store = TieredStore(MemoryLRU(), RedisStore(client))
-    return HistoricalService(store, market_ttl=market_ttl_from_env(env))
+    return HistoricalService(store, market_ttl=market_ttl_from_env(env), cooldown_redis=client)

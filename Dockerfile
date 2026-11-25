@@ -33,4 +33,4 @@ USER psxuser
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=5 \
   CMD python -c "import os, urllib.request; urllib.request.urlopen('http://localhost:' + os.environ.get('PORT', '8000') + '/health')"
 
-CMD exec uvicorn api.main:app --host 0.0.0.0 --port ${PORT} --workers 1
+CMD exec uvicorn api.main:app --host 0.0.0.0 --port ${PORT} --workers ${WEB_CONCURRENCY:-1} --proxy-headers
