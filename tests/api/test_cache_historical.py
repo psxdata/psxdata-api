@@ -311,3 +311,62 @@ def test_miss_nests_fetch_span_under_cache_span(clock: Clock, otel) -> None:
 
     make_service(clock).get("HBL", fetch)
     assert otel.span("psx.fetch").parent.span_id == otel.span("cache.historical").context.span_id
+
+
+def test_cooldown_is_shared_between_services_through_redis(clock: Clock) -> None:
+    server = fakeredis.FakeServer()
+    first = make_service(clock)
+    second = make_service(clock)
+    first._cooldown_redis = fakeredis.FakeRedis(server=server)
+    second._cooldown_redis = fakeredis.FakeRedis(server=server)
+
+    first_fetch = FakeFetch()
+    first_fetch.error = PSXRateLimitError("PSX rate limit exceeded (429)")
+    with pytest.raises(PSXRateLimitError):
+        first.get("SYS", first_fetch)
+
+    other_fetch = FakeFetch()
+    with pytest.raises(PSXRateLimitError, match="rate-limiting"):
+        second.get("HUBC", other_fetch)      # a different worker never calls PSX
+    assert other_fetch.calls == []
+
+    ttl = fakeredis.FakeRedis(server=server).ttl("psxdata:psx_cooldown")
+    assert 0 < ttl <= 60
+
+
+def test_cooldown_key_expires_for_other_services(clock: Clock) -> None:
+    client = fakeredis.FakeRedis()
+    first, second = make_service(clock), make_service(clock)
+    first._cooldown_redis = second._cooldown_redis = client
+    fetch = FakeFetch()
+    fetch.error = PSXRateLimitError("429")
+    with pytest.raises(PSXRateLimitError):
+        first.get("SYS", fetch)
+    client.delete("psxdata:psx_cooldown")    # what the TTL does after 60 s
+    assert second.get("HUBC", FakeFetch()).status is CacheStatus.MISS
+
+
+class BrokenRedis:
+    def exists(self, *args, **kwargs):
+        raise redis.ConnectionError("down")
+
+    def set(self, *args, **kwargs):
+        raise redis.ConnectionError("down")
+
+
+def test_cooldown_falls_back_to_local_timer_when_redis_errors(clock: Clock) -> None:
+    service = make_service(clock)
+    service._cooldown_redis = BrokenRedis()
+    fetch = FakeFetch()
+    assert service.get("SYS", fetch).status is CacheStatus.MISS   # read error: not in cooldown
+
+    clock.advance(31 * 60)
+    fetch.error = PSXRateLimitError("429")
+    assert service.get("SYS", fetch).status is CacheStatus.STALE  # write error: still cools down
+
+    fetch.error = None
+    clock.advance(30)
+    assert service.get("SYS", fetch).status is CacheStatus.STALE  # local timer holds
+    assert len(fetch.calls) == 2
+    clock.advance(31)
+    assert service.get("SYS", fetch).status is CacheStatus.MISS

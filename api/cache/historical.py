@@ -3,10 +3,13 @@
 PSX always returns a symbol's whole history, so one entry per symbol serves every date range.
 Concurrent misses for one symbol share a single PSX fetch via a fixed pool of striped locks.
 When PSX refuses (429) or is unavailable, the last cached copy is served as STALE. After a 429,
-PSX is not called again for ``cooldown_seconds``.
+PSX is not called again for ``cooldown_seconds``. With a Redis client the cooldown is shared by
+every worker; if Redis fails, each process falls back to its own timer.
 """
 from __future__ import annotations
 
+import logging
+import math
 import threading
 import time
 import zlib
@@ -16,6 +19,7 @@ from datetime import datetime, timedelta, timezone
 from enum import Enum
 from typing import Any
 
+import redis
 from opentelemetry.trace import Span
 from psxdata.exceptions import PSXRateLimitError, PSXUnavailableError
 
@@ -24,8 +28,11 @@ from api.cache.freshness import DEFAULT_MARKET_TTL, fresh_until
 from api.cache.store import TieredStore
 from api.telemetry import get_tracer
 
+logger = logging.getLogger(__name__)
+
 LOCK_STRIPES = 256
 PSX_COOLDOWN_SECONDS = 60
+COOLDOWN_KEY = "psxdata:psx_cooldown"
 COOLDOWN_MESSAGE = "PSX is rate-limiting requests; retry later"
 
 Row = dict[str, Any]
@@ -66,12 +73,14 @@ class HistoricalService:
         *,
         market_ttl: timedelta = DEFAULT_MARKET_TTL,
         cooldown_seconds: float = PSX_COOLDOWN_SECONDS,
+        cooldown_redis: redis.Redis | None = None,
         now: Callable[[], datetime] = _utcnow,
         monotonic: Callable[[], float] = time.monotonic,
     ) -> None:
         self.store = store
         self._market_ttl = market_ttl
         self._cooldown = cooldown_seconds
+        self._cooldown_redis = cooldown_redis
         self._now = now
         self._monotonic = monotonic
         self._blocked_until = 0.0
@@ -131,11 +140,29 @@ class HistoricalService:
 
     def _in_cooldown(self) -> bool:
         with self._state_lock:
-            return self._monotonic() < self._blocked_until
+            if self._monotonic() < self._blocked_until:
+                return True
+        if self._cooldown_redis is None:
+            return False
+        try:
+            return bool(self._cooldown_redis.exists(COOLDOWN_KEY))
+        except (redis.RedisError, OSError) as exc:
+            logger.warning(
+                "Shared PSX cooldown unreadable (%s); using local timer", type(exc).__name__
+            )
+            return False
 
     def _start_cooldown(self) -> None:
         with self._state_lock:
             self._blocked_until = self._monotonic() + self._cooldown
+        if self._cooldown_redis is None:
+            return
+        try:
+            self._cooldown_redis.set(COOLDOWN_KEY, "1", ex=max(1, math.ceil(self._cooldown)))
+        except (redis.RedisError, OSError) as exc:
+            logger.warning(
+                "Shared PSX cooldown not saved (%s); using local timer", type(exc).__name__
+            )
 
     @staticmethod
     def _fallback(entry: CacheEntry | None, exc: Exception) -> CacheResult:
